@@ -1,0 +1,123 @@
+section .data
+	nline db 10,10
+	nline_len: equ $-nline
+
+	menu db 10,"........ MENU ........"
+	     db 10,"1. HEX TO BCD"
+	     DB 10,"2. EXIT"
+	     db 10
+	     db 10," ENTER YOUR CHOICE:"
+	menu_len: equ $-menu
+
+	h2bmsg db 10,"HEX TO BCD"
+	       db 10," Enter 2 digit Hex Number:"
+	h2bmsg_len: equ $-h2bmsg
+
+	bmsg db 10,13,"Equivalent BCD Number is:"
+	bmsg_len: equ $-bmsg
+
+	emsg db 10,13,"Wrong Choice!!!!",10
+	emsg_len: equ $-emsg
+
+section .bss
+	buf resb 4
+	buf_len: equ $-buf     
+	digitcount resb 1
+	ans resw 1
+	char_ans resb 3
+
+%macro print 2
+	mov rax,1          ; function 1-Write
+	mov rdi,1	    ; stdout
+	mov rsi,%1          ; strign address
+	mov rdx,%2          ; string size
+	syscall             ;invoke os to write
+%endmacro
+
+%macro read 2
+	mov rax,0           ; function 0-read
+	mov rdi,0	    ; from stdin
+	mov rsi,%1          ; buffer address
+	mov rdx,%2          ; buffer size
+	syscall             ; invoke os to read
+%endmacro
+
+%macro exit 0
+	print nline, nline_len
+	mov eax,60          ; system call 60 to exit
+	xor rdi,rdi          ; return code 0
+	syscall              ;invoke os to exit
+%endmacro
+
+section .text
+global _start
+_start:
+	print menu,menu_len
+	read buf,2            ;choice + Enter
+	mov al,[buf]
+c1:	cmp al,'1'
+        jne c2
+        call hex_bcd
+        jmp _start	
+c2:	cmp al,'2'
+	jne err
+	
+	exit
+	
+err:	print emsg,emsg_len
+	jmp _start
+	
+	
+hex_bcd: 
+	print h2bmsg,h2bmsg_len
+	call accept
+	mov ax, bx
+	mov rbx,10
+back:	
+	xor rdx,rdx
+	div rbx               ; rax: Quotient, rdx: Remainder
+	push dx
+	inc byte[digitcount]
+	cmp rax,0h
+	jne back              ; repeat until remainder is left
+	print bmsg, bmsg_len
+print_bcd:
+	pop dx
+	add dl,30h            ; if no,is between 0-9 then add "30H"
+	mov [char_ans],dl     ; store character
+	print char_ans,1      ; print on screen in reverse order
+	dec byte[digitcount]	
+	jnz print_bcd
+	ret
+
+;----------------------------------------------------------------------------------
+accept:
+	read buf,3		; buflen=2+1
+	xor bx,bx
+	mov rcx,2
+	mov rsi,buf
+next_digit:
+	shl bx,04
+	mov al,[rsi]
+	cmp al,"0" 		;"0"=30h 0r 40d
+	jb error                ; jump if below "0" to error
+	cmp al,"9"
+	jbe sub30               ; subtract 30h if no. is in range of 0-9
+	cmp al,"A"              ;"A"=41 h or 65d
+	jb error                ;jump if below "A" to error
+	cmp al,"F"
+	jbe sub37               ; subtract 37H if no. is in range of A-F
+	cmp al,'a'              ;"a"= 61H or 97d
+	jb error                ; jump if below "a" to error
+	cmp al,"f"
+	jbe sub57               ; subtract 57H if no. is in range of a-f
+error: print emsg,emsg_len
+	exit
+
+sub57: sub al,20h              ;subtract 57H if no. is in range of a-f
+sub37: sub al,07h              ;subtract 37H if no. is in range of A-F
+sub30: sub al,30h              ;subtract 30h if no. is in range of 0-9
+	add bx,ax              ;prepare number
+	inc rsi                ;point to next digit
+	loop next_digit
+	ret

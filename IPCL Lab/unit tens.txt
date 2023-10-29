@@ -1,0 +1,57 @@
+section .data
+msg db 'Enter the two digit number :',10
+msglen: equ $-msg
+
+msg1 db 'Tens place :',10
+msglen1: equ $-msg1
+
+msg2 db 'unit place :',10
+msglen2: equ $-msg2
+
+
+section .bss		
+num1 resb 1		
+num2 resb 1		
+tens resb 1		
+unit resb 1		
+
+%macro RW 4 		
+mov eax,%1		
+mov ebx,%2
+mov ecx,%3
+mov edx,%4    		
+int 80h
+%endmacro
+
+section .text
+global _start
+_start:
+
+
+RW 4,1,msg,msglen        	;display 'Enter the two digit number1'
+
+RW 3,0,num1,2           	;Accept Number1
+
+mov al,[num1]   		
+mov ah,0
+
+mov bl,10
+
+div bl				;Q(al)=ax/bl, R(ah)=ax/bl
+add al,'0' 			;convert quotient to ASCII
+mov [tens],al		;storing ASCII quotient to variable
+add ah,'0' 			;convert remainder to ASCII
+mov [unit],ah		;storing ASCII remainder to variable
+
+
+RW 4,1,msg2,msg2len        	;display 'Tens place = '
+
+RW 4,1,tens,1      		;display tens place on screen
+
+RW 4,1,msg3,msg3len        	;display 'unit place is = '
+
+RW 4,1,unit,1      		;display unit place on screen
+
+mov eax,1
+mov ebx,0			;EXIT
+int 80h

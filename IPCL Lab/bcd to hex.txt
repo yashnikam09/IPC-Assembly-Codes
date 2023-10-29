@@ -1,0 +1,111 @@
+section .data
+	nline db 10,10
+	nline_len: equ $-nline
+
+	menu db 10,"........ MENU ........"
+	     db 10,"1. BCD TO HEX"
+	     DB 10,"2. EXIT"
+	     db 10
+	     db 10," ENTER YOUR CHOICE:"
+	menu_len: equ $-menu
+
+	b2hmsg db 10,"BCD TO HEX"
+       		db 10," Enter 3 digit BCD Number:"
+	b2hmsg_len: equ $-b2hmsg
+
+	hmsg db 10,13,"Equivalent Hex Number is"
+	hmsg_len: equ $-hmsg
+
+	emsg db 10,13,"Wrong Choice!!!!",10
+	emsg_len: equ $-emsg
+
+section .bss
+	buf resb 4
+	buf_len: equ $-buf     
+	digitcount resb 1
+	ans resw 1
+	char_ans resb 4
+
+%macro print 2
+	mov rax,1          ; function 1-Write
+	mov rdi,1	    ; stdout
+	mov rsi,%1          ; strign address
+	mov rdx,%2          ; string size
+	syscall             ;invoke os to write
+%endmacro
+
+%macro read 2
+	mov rax,0           ; function 0-read
+	mov rdi,0	    ; from stdin
+	mov rsi,%1          ; buffer address
+	mov rdx,%2          ; buffer size
+	syscall             ; invoke os to read
+%endmacro
+
+%macro exit 0
+	print nline, nline_len
+	mov eax,60          ; system call 60 to exit
+	xor rdi,rdi          ; return code 0
+	syscall              ;invoke os to exit
+%endmacro
+
+section .text
+global _start
+_start:
+	print menu,menu_len
+	read buf,2            ;choice + Enter
+	mov al,[buf]
+c1:	cmp al,'1'
+        jne c2
+        call bcd_hex
+        jmp _start	
+c2:	cmp al,'2'
+	jne err
+	
+	exit
+	
+err:	print emsg,emsg_len
+	jmp _start
+	
+	
+
+bcd_hex:
+	print b2hmsg, b2hmsg_len	
+	read buf, buf_len      ; buffer length=6
+	mov rsi,buf            ; load BCD pointer
+	xor rax,rax            ; sum
+	mov rbx,10
+	mov rcx,03             ; digit count
+back1:  xor rdx,rdx
+	mul ebx                ; previous digit *10= ans {rax*rbx= rdx: rax}
+	xor rdx, rdx
+	mov dl,[rsi]           ; take current digit
+	sub dl,30h             ; accepted digit is decimal so sub 30H
+	add rax,rdx
+	inc rsi
+	dec rcx
+	jnz back1
+	
+	mov [ans],ax
+	print hmsg, hmsg_len
+	mov ax,[ans]
+	call display
+	ret
+
+display:
+	mov rsi,char_ans+1     ;load last byte code of char_ans in rsi
+	mov rcx,2              ; number of digits
+cnt:	mov rdx,0              ; rdx=0 (div in : rdx:rax/rbx)
+	mov rbx,16             ; divisor=16 for Hex
+	div rbx
+	cmp dl,09h             ; check for remainder in dx
+	jbe add30
+	add dl,07h
+add30:  add dl,30h             ; calculate ASCII code
+	mov [rsi],dl           ; store in buffer
+	dec rsi                ; point to one byte back
+	dec rcx                ; decrement count
+	jnz cnt                ; if not zero repeat		
+			
+	 print char_ans,4      ; display result on screen
+	 ret
